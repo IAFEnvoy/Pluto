@@ -1,9 +1,12 @@
-package network
+package vanilla
 
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"pluto/global"
+	"pluto/util"
+	"pluto/util/network"
 )
 
 type SingleManifest struct {
@@ -39,7 +42,7 @@ func GetOrDownload(mcVersion string) (Downloads, error) {
 		return downloads, nil
 	}
 	//request launcher meta
-	data, err := Get(global.Config.Urls.MojangLauncherMeta + "/mc/game/version_manifest_v2.json")
+	data, err := network.Get(global.Config.Urls.MojangLauncherMeta + "/mc/game/version_manifest_v2.json")
 	if err != nil {
 		return Downloads{}, err
 	}
@@ -59,7 +62,7 @@ func GetOrDownload(mcVersion string) (Downloads, error) {
 		return Downloads{}, errors.New("Cannot find mc version " + mcVersion)
 	}
 	//request piston data
-	data, err = Get(url)
+	data, err = network.Get(url)
 	if err != nil {
 		return Downloads{}, err
 	}
@@ -70,4 +73,22 @@ func GetOrDownload(mcVersion string) (Downloads, error) {
 	}
 	cache[mcVersion] = downloads.Downloads
 	return downloads.Downloads, nil
+}
+
+func GetMcJarPath(mcVersion string) (string, error) {
+	path := global.GetMinecraftPath(mcVersion)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return path, nil
+	}
+	downloads, err := GetOrDownload(mcVersion)
+	if err != nil {
+		util.LOGGER.Error("Unable to download " + mcVersion + " meta : " + err.Error())
+		return "", err
+	}
+	err = network.File(downloads.Client.Url, path)
+	if err != nil {
+		util.LOGGER.Error("Unable to download " + mcVersion + " file : " + err.Error())
+		return "", err
+	}
+	return path, nil
 }

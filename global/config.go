@@ -9,9 +9,10 @@ import (
 
 type Urls struct {
 	MavenCentral       string `yaml:"MavenCentral"`
+	MojangLauncherMeta string `yaml:"mojangLauncherMeta"`
 	FabricMaven        string `yaml:"fabricMaven"`
 	FabricMeta         string `yaml:"fabricMeta"`
-	MojangLauncherMeta string `yaml:"mojangLauncherMeta"`
+	NeoForgeMaven      string `yaml:"neoForgeMaven"`
 }
 
 type ConfigObject struct {
@@ -25,9 +26,10 @@ var Config = ConfigObject{
 	JavaPath: "java",
 	Urls: Urls{
 		MavenCentral:       "https://repo1.maven.org/maven2",
+		MojangLauncherMeta: "https://launchermeta.mojang.com",
 		FabricMaven:        "https://maven.fabricmc.net",
 		FabricMeta:         "https://meta.fabricmc.net",
-		MojangLauncherMeta: "https://launchermeta.mojang.com",
+		NeoForgeMaven:      "https://maven.neoforged.net/releases",
 	},
 }
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"pluto/util"
+	"pluto/util/network"
 	"strconv"
 	"strings"
 	"time"
@@ -33,14 +34,12 @@ type LibraryConfig struct {
 
 const (
 	LibraryPath           = "libraries"
+	ClassPath             = LibraryPath + "/*"
+	DecompilerPath        = LibraryPath + "/vineflower.jar"
+	TinyRemapperMainClass = "net.fabricmc.tinyremapper.Main"
+	ArtMainClass          = "net.neoforged.art.Main"
 	configPath            = LibraryPath + "/versions.json"
 	httpTimeout           = 30 * time.Second
-	TinyRemapperMainClass = "net.fabricmc.tinyremapper.Main"
-)
-
-var (
-	ClassPath      = LibraryPath + "/*"
-	DecompilerPath = filepath.Join(LibraryPath, "vineflower.jar")
 )
 
 func CheckLibrary() {
@@ -73,6 +72,14 @@ func CheckLibrary() {
 			MavenRepoURL:    Config.Urls.FabricMaven,
 		},
 		{
+			Name:            "auto-renaming-tool.jar",
+			MavenGroupID:    "net.neoforged",
+			MavenArtifactID: "AutoRenamingTool",
+			MavenRepoURL:    Config.Urls.NeoForgeMaven,
+		},
+		//These followings are dependencies
+		//Tiny Remapper dependencies
+		{
 			Name:            "mapping-io.jar",
 			MavenGroupID:    "net.fabricmc",
 			MavenArtifactID: "mapping-io",
@@ -98,6 +105,31 @@ func CheckLibrary() {
 			MavenArtifactID: "asm-tree",
 			MavenRepoURL:    Config.Urls.FabricMaven,
 			CurrentVersion:  "9.8",
+		},
+		//Auto Renaming Tool dependencies
+		{
+			Name:            "jopt-simple.jar",
+			MavenGroupID:    "net.sf.jopt-simple",
+			MavenArtifactID: "jopt-simple",
+			MavenRepoURL:    Config.Urls.MavenCentral,
+		},
+		{
+			Name:            "srgutils.jar",
+			MavenGroupID:    "net.neoforged",
+			MavenArtifactID: "srgutils",
+			MavenRepoURL:    Config.Urls.NeoForgeMaven,
+		},
+		{
+			Name:            "gson.jar",
+			MavenGroupID:    "com.google.code.gson",
+			MavenArtifactID: "gson",
+			MavenRepoURL:    Config.Urls.MavenCentral,
+		},
+		{
+			Name:            "cli-utils.jar",
+			MavenGroupID:    "net.neoforged.installertools",
+			MavenArtifactID: "cli-utils",
+			MavenRepoURL:    Config.Urls.NeoForgeMaven,
 		},
 	}
 
@@ -207,7 +239,7 @@ func checkAndUpdateTool(tool ToolInfo, config *LibraryConfig) error {
 
 		// 下载文件
 		tmpPath := toolPath + ".tmp"
-		if err := downloadFile(tmpPath, tool.URL); err != nil {
+		if err := network.File(tool.URL, tmpPath); err != nil {
 			util.LOGGER.Error("Failed to download file:  " + err.Error())
 			return err
 		}
@@ -282,7 +314,12 @@ func getLatestMavenVersion(groupID, artifactID, repoURL string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			util.LOGGER.Error("Failed to close response body: " + err.Error())
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		util.LOGGER.Error("Failed to load versions from " + metadataURL + " with status code " + strconv.Itoa(resp.StatusCode))
@@ -345,7 +382,12 @@ func getVersionFromURL(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			util.LOGGER.Error("Failed to close response body: " + err.Error())
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		util.LOGGER.Error("Failed to load url head from maven with status code " + strconv.Itoa(resp.StatusCode))
@@ -376,7 +418,12 @@ func calculateFileHash(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			util.LOGGER.Error("Failed to close file: " + err.Error())
+		}
+	}(file)
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -384,66 +431,4 @@ func calculateFileHash(path string) (string, error) {
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-// 下载文件
-func downloadFile(dstPath, url string) error {
-	util.LOGGER.Info("Downloading: " + url)
-	// 创建临时文件
-	tmpFile, err := os.CreateTemp(filepath.Dir(dstPath), filepath.Base(dstPath)+".tmp.*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmpFile.Name()
-	defer func() {
-		err = tmpFile.Close()
-		// 如果下载失败，删除临时文件
-		if err != nil {
-			err := os.Remove(tmpPath)
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-	// 获取URL内容
-	client := &http.Client{Timeout: httpTimeout}
-	resp, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(resp.Body)
-
-	// 检查HTTP状态码
-	if resp.StatusCode != http.StatusOK {
-		util.LOGGER.Error("Failed to download from maven with status code " + strconv.Itoa(resp.StatusCode))
-		return errors.New("failed to download from maven")
-	}
-
-	// 写入文件
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		return err
-	}
-
-	// 确保文件内容已写入磁盘
-	if err := tmpFile.Sync(); err != nil {
-		return err
-	}
-
-	// 关闭文件
-	if err := tmpFile.Close(); err != nil {
-		return err
-	}
-
-	// 移动临时文件到目标位置
-	if err := os.Rename(tmpPath, dstPath); err != nil {
-		return err
-	}
-
-	return nil
 }

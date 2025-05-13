@@ -1,16 +1,20 @@
-package download
+package services
 
 import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"pluto/global"
 	"pluto/util"
 	"pluto/util/network"
+	"pluto/vanilla"
 )
+
+type Yarn struct{}
 
 type YarnVersion struct {
 	GameVersion string `json:"gameVersion"`
@@ -21,26 +25,22 @@ type YarnVersion struct {
 	Stable      bool   `json:"stable"`
 }
 
-const yarnMappingFolder = "cache/mappings/yarn/"
+func (s Yarn) GetName() string {
+	return "yarn"
+}
 
-func GetYarnPath(mcVersion string) (string, error) {
-	err := os.MkdirAll(yarnMappingFolder, os.ModePerm)
-	if err != nil {
-		return "", err
-	}
-	path := yarnMappingFolder + mcVersion + ".tiny"
+func (s Yarn) GetPathOrDownload(mcVersion string) (string, error) {
+	path := global.GetMappingPath(s, mcVersion, "tiny")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return path, nil
 	}
 	body, err := network.Get(global.Config.Urls.FabricMeta + "/v2/versions/yarn")
 	if err != nil {
-		util.LOGGER.Error("Unable to download yarn version: " + err.Error())
-		return "", err
+		return "", errors.New("Unable to download yarn versions: " + err.Error())
 	}
 	var versions []YarnVersion
 	if err := json.Unmarshal(body, &versions); err != nil {
-		util.LOGGER.Error("Unable to unmarshal yarn versions: " + err.Error())
-		return "", err
+		return "", errors.New("Unable to unmarshal yarn versions: " + err.Error())
 	}
 	var latestVersion *YarnVersion
 	for i := range versions {
@@ -52,18 +52,15 @@ func GetYarnPath(mcVersion string) (string, error) {
 		}
 	}
 	if latestVersion == nil {
-		util.LOGGER.Error("Unable to find latest version for " + mcVersion)
-		return "", fmt.Errorf("unable to find latest version for %s", mcVersion)
+		return "", errors.New("Unable to find latest version for " + mcVersion)
 	}
 	jar, err := network.Get(fmt.Sprintf(global.Config.Urls.FabricMaven+"/net/fabricmc/yarn/%s/yarn-%s-tiny.gz", latestVersion.Version, latestVersion.Version))
 	if err != nil {
-		util.LOGGER.Error("Unable to download yarn mapping: " + err.Error())
-		return "", err
+		return "", errors.New("Unable to download yarn mapping: " + err.Error())
 	}
 	data, err := getMappingsTinyFromGzip(jar)
 	if err != nil {
-		util.LOGGER.Error("Unable to unzip yarn mapping: " + err.Error())
-		return "", err
+		return "", errors.New("Unable to unzip yarn mapping: " + err.Error())
 	}
 	err = os.WriteFile(path, data, 0644)
 	if err != nil {
@@ -72,12 +69,31 @@ func GetYarnPath(mcVersion string) (string, error) {
 	return path, nil
 }
 
+func (s Yarn) Remap(mcVersion string) (string, error) {
+	jarPath, err := vanilla.GetMcJarPath(mcVersion)
+	if err != nil {
+		return "", err
+	}
+	mappingPath, err := s.GetPathOrDownload(mcVersion)
+	if err != nil {
+		return "", err
+	}
+	outputPath := global.GetRemappedPath(s, mappingPath)
+	util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "official", "named"}, false)
+	return outputPath, nil
+}
+
 func getMappingsTinyFromGzip(gzipData []byte) ([]byte, error) {
 	gzipReader, err := gzip.NewReader(bytes.NewReader(gzipData))
 	if err != nil {
 		return nil, err
 	}
-	defer gzipReader.Close()
+	defer func(gzipReader *gzip.Reader) {
+		err := gzipReader.Close()
+		if err != nil {
+			util.LOGGER.Error("Error closing gzip reader: " + err.Error())
+		}
+	}(gzipReader)
 	content, err := io.ReadAll(gzipReader)
 	if err != nil {
 		return nil, err

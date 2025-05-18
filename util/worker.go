@@ -1,6 +1,7 @@
 package util
 
 import (
+	"log/slog"
 	"sync"
 )
 
@@ -10,10 +11,9 @@ type WorkerPool struct {
 	once     sync.Once
 }
 
-var threadPool = GetWorkerPool(4)
+var threadPool = getWorkerPool(4)
 
-// GetWorkerPool 获取全局线程池实例(单例模式)
-func GetWorkerPool(numWorkers int) *WorkerPool {
+func getWorkerPool(numWorkers int) *WorkerPool {
 	pool := &WorkerPool{
 		taskChan: make(chan func() error, 100),
 	}
@@ -29,7 +29,7 @@ func (p *WorkerPool) worker() {
 	for task := range p.taskChan {
 		if task != nil {
 			if err := task(); err != nil {
-				LOGGER.Error("Function task failed: " + err.Error())
+				slog.Error("Function task failed: " + err.Error())
 			}
 		}
 	}

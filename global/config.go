@@ -3,8 +3,8 @@ package global
 import (
 	encoder "github.com/zwgblue/yaml-encoder"
 	"gopkg.in/yaml.v3"
+	"log/slog"
 	"os"
-	"pluto/util"
 )
 
 type Urls struct {
@@ -16,13 +16,15 @@ type Urls struct {
 }
 
 type ConfigObject struct {
+	Port     int    `yaml:"port" comment:"http server port"`
 	JavaPath string `yaml:"javaPath" comment:"executable java file for command"`
-	Urls     Urls   `yaml:"urls"`
+	Urls     Urls   `yaml:"urls" comment:"if official source is too slow, try BMCLAPI: https://bmclapidoc.bangbang93.com/"`
 }
 
 const ConfigPath = "config.yaml"
 
 var Config = ConfigObject{
+	Port:     5678,
 	JavaPath: "java",
 	Urls: Urls{
 		MavenCentral:       "https://repo1.maven.org/maven2",
@@ -34,7 +36,7 @@ var Config = ConfigObject{
 }
 
 func LoadConfig() error {
-	util.LOGGER.Info("Loading global config: " + ConfigPath)
+	slog.Info("Loading global config: " + ConfigPath)
 	if _, err := os.Stat(ConfigPath); os.IsNotExist(err) {
 		encoded := encoder.NewEncoder(Config, encoder.WithComments(encoder.CommentsOnHead))
 		bytes, err := encoded.Encode()

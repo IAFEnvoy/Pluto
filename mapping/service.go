@@ -3,6 +3,7 @@ package mapping
 import (
 	"errors"
 	"pluto/global"
+	"pluto/mapping/misc"
 	"pluto/mapping/services"
 	"pluto/util"
 )
@@ -10,12 +11,21 @@ import (
 type Service interface {
 	GetName() string
 	GetPathOrDownload(mcVersion string) (string, error)
+	LoadMapping(mcVersion string) (map[misc.SingleInfo]misc.SingleInfo, error) //All default is notch->target
 	Remap(mcVersion string) (string, error)
 }
 
 var serviceMap = map[string]Service{
 	"official": &services.Official{},
 	"yarn":     &services.Yarn{},
+}
+
+func LoadMapping(mcVersion, mapping string) (map[misc.SingleInfo]misc.SingleInfo, error) {
+	service, ok := serviceMap[mapping]
+	if !ok {
+		return nil, errors.New("unknown mapping type")
+	}
+	return service.LoadMapping(mcVersion)
 }
 
 func GenerateSource(mcVersion, mapping string) (string, error) {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"pluto/util"
@@ -12,7 +13,7 @@ import (
 )
 
 func Get(url string) ([]byte, error) {
-	util.LOGGER.Info("Downloading: " + url)
+	slog.Info("Downloading: " + url)
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -34,7 +35,7 @@ func Get(url string) ([]byte, error) {
 }
 
 func File(url string, path string) error {
-	util.LOGGER.Info("Downloading: " + url)
+	slog.Info("Downloading: " + url)
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

@@ -3,10 +3,10 @@ package global
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -43,17 +43,17 @@ const (
 )
 
 func CheckLibrary() {
-	util.LOGGER.Info("Start checking libraries")
+	slog.Info("Start checking libraries...")
 	// 确保保存工具的目录存在
 	if err := os.MkdirAll(LibraryPath, 0755); err != nil {
-		util.LOGGER.Error("Failed to create library folder:  " + err.Error())
+		slog.Error("Failed to create library folder:  " + err.Error())
 		return
 	}
 
 	// 加载配置文件
-	config, err := loadConfig()
+	config, err := util.LoadConfig[LibraryConfig](configPath)
 	if err != nil {
-		util.LOGGER.Error("Failed to load library global:  " + err.Error())
+		slog.Error("Failed to load library global:  " + err.Error())
 		config = LibraryConfig{}
 	}
 
@@ -135,47 +135,14 @@ func CheckLibrary() {
 
 	for _, tool := range toolsToUpdate {
 		if err := checkAndUpdateTool(tool, &config); err != nil {
-			util.LOGGER.Error("Failed to update " + tool.Name + ":  " + err.Error())
+			slog.Error("Failed to update " + tool.Name + ":  " + err.Error())
 		}
 	}
 
 	// 保存更新后的配置
-	if err := saveConfig(config); err != nil {
-		util.LOGGER.Error("Failed to save library global:  " + err.Error())
+	if err := util.SaveConfig(config, configPath); err != nil {
+		slog.Error("Failed to save library global:  " + err.Error())
 	}
-}
-
-// 加载配置文件
-func loadConfig() (LibraryConfig, error) {
-	var config LibraryConfig
-
-	// 检查配置文件是否存在
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return config, nil
-	}
-
-	// 读取配置文件
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return config, err
-	}
-
-	// 解析配置文件
-	if err := json.Unmarshal(data, &config); err != nil {
-		return config, err
-	}
-
-	return config, nil
-}
-
-// 保存配置文件
-func saveConfig(config LibraryConfig) error {
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(configPath, data, 0644)
 }
 
 // 检查并更新工具
@@ -201,17 +168,17 @@ func checkAndUpdateTool(tool ToolInfo, config *LibraryConfig) error {
 		latestVersion, err = getLatestMavenVersion(tool.MavenGroupID, tool.MavenArtifactID, tool.MavenRepoURL)
 		if err != nil {
 			latestVersion = tool.CurrentVersion
-			util.LOGGER.Error("Failed to load versions, try to use hardcoded version " + latestVersion)
+			slog.Error("Failed to load versions, try to use hardcoded version " + latestVersion)
 		}
 		tool.URL = fmt.Sprintf("%s/%s/%s/%s/%s-%s.jar", tool.MavenRepoURL, strings.ReplaceAll(tool.MavenGroupID, ".", "/"), tool.MavenArtifactID, latestVersion, tool.MavenArtifactID, latestVersion)
 	} else if tool.URL != "" {
 		latestVersion, err = getVersionFromURL(tool.URL)
 		if err != nil {
-			util.LOGGER.Error("Failed to load versions:  " + err.Error())
+			slog.Error("Failed to load versions:  " + err.Error())
 			latestVersion = tool.CurrentVersion
 		}
 	} else {
-		util.LOGGER.Error("Cannot update " + tool.Name + " since no url provided")
+		slog.Error("Cannot update " + tool.Name + " since no url provided")
 		return err
 	}
 
@@ -235,29 +202,29 @@ func checkAndUpdateTool(tool ToolInfo, config *LibraryConfig) error {
 
 	// 如果需要更新，下载最新版本
 	if needsUpdate {
-		util.LOGGER.Info("Updating " + tool.Name + " to " + latestVersion + "...")
+		slog.Info("Updating " + tool.Name + " to " + latestVersion + "...")
 
 		// 下载文件
 		tmpPath := toolPath + ".tmp"
 		if err := network.File(tool.URL, tmpPath); err != nil {
-			util.LOGGER.Error("Failed to download file:  " + err.Error())
+			slog.Error("Failed to download file:  " + err.Error())
 			return err
 		}
 
 		// 计算下载文件的哈希值
 		newHash, err := calculateFileHash(tmpPath)
 		if err != nil {
-			util.LOGGER.Error("Failed to calculate file hash:  " + err.Error())
+			slog.Error("Failed to calculate file hash:  " + err.Error())
 			return err
 		}
 
 		// 替换旧文件
 		if err := os.Rename(tmpPath, toolPath); err != nil {
-			util.LOGGER.Error("Failed to replace file:  " + err.Error())
+			slog.Error("Failed to replace file:  " + err.Error())
 			return err
 		}
 
-		util.LOGGER.Info("Successfully update " + tool.Name + " to " + latestVersion)
+		slog.Info("Successfully update " + tool.Name + " to " + latestVersion)
 
 		// 更新配置
 		newTool := ToolInfo{
@@ -294,7 +261,7 @@ func checkAndUpdateTool(tool ToolInfo, config *LibraryConfig) error {
 			})
 		}
 
-		util.LOGGER.Info(tool.Name + " is already the latest version " + currentVersion)
+		slog.Info(tool.Name + " is already the latest version " + currentVersion)
 	}
 
 	return nil
@@ -317,12 +284,12 @@ func getLatestMavenVersion(groupID, artifactID, repoURL string) (string, error) 
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			util.LOGGER.Error("Failed to close response body: " + err.Error())
+			slog.Error("Failed to close response body: " + err.Error())
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		util.LOGGER.Error("Failed to load versions from " + metadataURL + " with status code " + strconv.Itoa(resp.StatusCode))
+		slog.Error("Failed to load versions from " + metadataURL + " with status code " + strconv.Itoa(resp.StatusCode))
 		return "", errors.New("failed to load versions from maven")
 	}
 
@@ -349,7 +316,7 @@ func getLatestMavenVersion(groupID, artifactID, repoURL string) (string, error) 
 	// 如果没有<latest>标签，尝试提取<version>标签中的最后一个版本
 	versionStart = strings.Index(metadata, "<version>")
 	if versionStart == -1 {
-		util.LOGGER.Error("Failed to parse latest version")
+		slog.Error("Failed to parse latest version")
 		return "", errors.New("failed to parse latest version")
 	}
 
@@ -367,7 +334,7 @@ func getLatestMavenVersion(groupID, artifactID, repoURL string) (string, error) 
 	}
 
 	if len(versions) == 0 {
-		util.LOGGER.Error("No versions found for " + artifactID)
+		slog.Error("No versions found for " + artifactID)
 		return "", errors.New("no versions found for " + artifactID)
 	}
 	latestVersion := versions[len(versions)-1]
@@ -385,12 +352,12 @@ func getVersionFromURL(url string) (string, error) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			util.LOGGER.Error("Failed to close response body: " + err.Error())
+			slog.Error("Failed to close response body: " + err.Error())
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		util.LOGGER.Error("Failed to load url head from maven with status code " + strconv.Itoa(resp.StatusCode))
+		slog.Error("Failed to load url head from maven with status code " + strconv.Itoa(resp.StatusCode))
 		return "", errors.New("failed to load url head from maven")
 	}
 
@@ -421,7 +388,7 @@ func calculateFileHash(path string) (string, error) {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			util.LOGGER.Error("Failed to close file: " + err.Error())
+			slog.Error("Failed to close file: " + err.Error())
 		}
 	}(file)
 

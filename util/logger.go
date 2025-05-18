@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var LOGGER = slog.New(tint.NewHandler(os.Stderr, &tint.Options{
+var Logger = slog.New(tint.NewHandler(os.Stderr, &tint.Options{
 	Level:      slog.LevelDebug,
 	TimeFormat: time.Kitchen,
 	NoColor:    false,
@@ -21,3 +21,16 @@ var LOGGER = slog.New(tint.NewHandler(os.Stderr, &tint.Options{
 		return a
 	},
 }))
+
+func InitLogger() {
+	slog.SetDefault(Logger)
+}
+
+type SlogWriter struct {
+	Level slog.Level
+}
+
+func (s *SlogWriter) Write(p []byte) (n int, err error) {
+	Logger.Log(nil, s.Level, string(p))
+	return len(p), nil
+}

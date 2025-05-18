@@ -3,9 +3,9 @@ package vanilla
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"pluto/global"
-	"pluto/util"
 	"pluto/util/network"
 )
 
@@ -82,12 +82,12 @@ func GetMcJarPath(mcVersion string) (string, error) {
 	}
 	downloads, err := GetOrDownload(mcVersion)
 	if err != nil {
-		util.LOGGER.Error("Unable to download " + mcVersion + " meta : " + err.Error())
+		slog.Error("Unable to download " + mcVersion + " meta : " + err.Error())
 		return "", err
 	}
 	err = network.File(downloads.Client.Url, path)
 	if err != nil {
-		util.LOGGER.Error("Unable to download " + mcVersion + " file : " + err.Error())
+		slog.Error("Unable to download " + mcVersion + " file : " + err.Error())
 		return "", err
 	}
 	return path, nil

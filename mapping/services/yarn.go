@@ -1,17 +1,22 @@
 package services
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
+	"pluto/convert"
 	"pluto/global"
+	"pluto/mapping/misc"
 	"pluto/util"
 	"pluto/util/network"
 	"pluto/vanilla"
+	"strings"
 )
 
 type Yarn struct{}
@@ -69,6 +74,69 @@ func (s Yarn) GetPathOrDownload(mcVersion string) (string, error) {
 	return path, nil
 }
 
+func (s Yarn) LoadMapping(mcVersion string) (map[misc.SingleInfo]misc.SingleInfo, error) {
+	path, err := s.GetPathOrDownload(mcVersion)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("无法打开文件: %w", err)
+	}
+	defer file.Close()
+
+	mapping := make(map[misc.SingleInfo]misc.SingleInfo)
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		_ = scanner.Text() //Remove the first definition line
+	}
+	for scanner.Scan() {
+		line := scanner.Text()
+		split := strings.Split(line, "\t")
+		if len(split) < 4 {
+			continue
+		}
+		switch split[0] {
+		case "CLASS":
+			notch, yarn := misc.PackClassInfo(split[1]), misc.PackClassInfo(split[3])
+			mapping[notch] = yarn
+			break
+		case "METHOD":
+			yarnClass, ok := mapping[misc.PackClassInfo(split[1])]
+			if !ok {
+				continue
+			}
+			notch, yarn := misc.PackMethodInfo(split[3], split[1], split[2]), misc.PackMethodInfo(split[5], yarnClass.Signature, "")
+			mapping[notch] = yarn
+			break
+		case "FIELD":
+			yarnClass, ok := mapping[misc.PackClassInfo(split[1])]
+			if !ok {
+				continue
+			}
+			notch, yarn := misc.PackFieldInfo(split[3], split[1], split[2]), misc.PackFieldInfo(split[5], yarnClass.Signature, "")
+			mapping[notch] = yarn
+			break
+		}
+	}
+	//End processor
+	result, classMapping := make(map[misc.SingleInfo]misc.SingleInfo), make(map[string]string)
+	for notch, yarn := range mapping {
+		if notch.Type == "class" {
+			classMapping[notch.Signature] = yarn.Signature
+		}
+	}
+	for notch, yarn := range mapping {
+		notch.Name = convert.FullToClassName(notch.Name)
+		yarn.Name = convert.FullToClassName(yarn.Name)
+		if notch.Type == "method" {
+			yarn.Signature = misc.ObfuscateMethodSignature(notch.Signature, classMapping)
+		}
+		result[notch] = yarn
+	}
+	return result, nil
+}
+
 func (s Yarn) Remap(mcVersion string) (string, error) {
 	jarPath, err := vanilla.GetMcJarPath(mcVersion)
 	if err != nil {
@@ -79,7 +147,7 @@ func (s Yarn) Remap(mcVersion string) (string, error) {
 		return "", err
 	}
 	outputPath := global.GetRemappedPath(s, mappingPath)
-	util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "official", "named"}, false)
+	util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "yarn", "named"}, false)
 	return outputPath, nil
 }
 
@@ -91,7 +159,7 @@ func getMappingsTinyFromGzip(gzipData []byte) ([]byte, error) {
 	defer func(gzipReader *gzip.Reader) {
 		err := gzipReader.Close()
 		if err != nil {
-			util.LOGGER.Error("Error closing gzip reader: " + err.Error())
+			slog.Error("Error closing gzip reader: " + err.Error())
 		}
 	}(gzipReader)
 	content, err := io.ReadAll(gzipReader)

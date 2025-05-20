@@ -122,6 +122,12 @@ func (m *Mappings) Search(keyword string, maxCount int) []InfoForNetwork {
 	return final
 }
 
+func (m *Mappings) AppendTranslate(infos *[]InfoForNetwork) {
+	for i, info := range *infos {
+		(*infos)[i].Translated = m.NotchToNamed[info.Notch]
+	}
+}
+
 // 判断匹配类型并返回权重
 func getMatchType(name, keyword string) int {
 	nameLower := strings.ToLower(name)

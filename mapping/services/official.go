@@ -87,13 +87,13 @@ func (s *Official) LoadMapping(mcVersion string) (*map[java.SingleInfo]java.Sing
 				if err != nil {
 					continue
 				}
-				notch, named := java.PackMethodInfo(split[1], cachedNotchClass.Signature, ""), java.PackMethodInfo(name, cachedNamedClass.Signature, signature)
+				notch, named := java.PackMethodInfo(split[1], cachedNotchClass.Class, ""), java.PackMethodInfo(name, cachedNamedClass.Class, signature)
 				mapping[notch] = named
 			}
 		} else { //Field
 			s := strings.Split(strings.TrimSpace(split[0]), " ")
 			if len(s) == 2 {
-				notch, named := java.PackFieldInfo(split[1], cachedNotchClass.Signature, ""), java.PackFieldInfo(s[1], cachedNamedClass.Signature, s[0])
+				notch, named := java.PackFieldInfo(split[1], cachedNotchClass.Class, ""), java.PackFieldInfo(s[1], cachedNamedClass.Class, java.ClassToByteCodeSignature(s[0]))
 				mapping[notch] = named
 			}
 		}
@@ -110,6 +110,8 @@ func (s *Official) LoadMapping(mcVersion string) (*map[java.SingleInfo]java.Sing
 		named.Name = java.FullToClassName(named.Name)
 		if notch.Type == "method" {
 			notch.Signature = java.ObfuscateMethodSignature(named.Signature, classMapping)
+		} else if notch.Type == "field" {
+			notch.Signature = java.ObfuscateTypeSignature(named.Signature, classMapping)
 		}
 		result[notch] = named
 	}

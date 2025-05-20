@@ -143,6 +143,8 @@ func (s *Yarn) LoadMapping(mcVersion string) (*map[java.SingleInfo]java.SingleIn
 		yarn.Name = java.FullToClassName(yarn.Name)
 		if notch.Type == "method" {
 			yarn.Signature = java.ObfuscateMethodSignature(notch.Signature, classMapping)
+		} else if notch.Type == "field" {
+			yarn.Signature = java.ObfuscateTypeSignature(notch.Signature, classMapping)
 		}
 		result[notch] = yarn
 	}

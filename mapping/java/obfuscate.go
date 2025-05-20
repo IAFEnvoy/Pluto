@@ -13,27 +13,27 @@ func ObfuscateMethodSignature(signature string, obfuscationMap map[string]string
 	}
 	paramTypes := signature[paramStart+1 : paramEnd]
 	returnType := signature[paramEnd+1:]
-	processedParams := processTypes(paramTypes, obfuscationMap)
+	processedParams := ObfuscateTypeSignature(paramTypes, obfuscationMap)
 	processedReturn := processType(returnType, obfuscationMap)
 	return fmt.Sprintf("(%s)%s", processedParams, processedReturn)
 }
 
-func processTypes(types string, obfuscationMap map[string]string) string {
+func ObfuscateTypeSignature(signature string, obfuscationMap map[string]string) string {
 	var result strings.Builder
 	i := 0
-	for i < len(types) {
-		switch types[i] {
+	for i < len(signature) {
+		switch signature[i] {
 		case '[': // 数组类型
 			result.WriteByte('[')
 			i++
 		case 'L': // 对象类型 (类或接口)
 			// 查找类型结束符 ';'
 			end := i + 1
-			for end < len(types) && types[end] != ';' {
+			for end < len(signature) && signature[end] != ';' {
 				end++
 			}
-			if end < len(types) {
-				classSig := types[i : end+1]
+			if end < len(signature) {
+				classSig := signature[i : end+1]
 				// 查找混淆映射
 				if obfuscated, exists := obfuscationMap[classSig]; exists {
 					result.WriteString(obfuscated)
@@ -43,11 +43,11 @@ func processTypes(types string, obfuscationMap map[string]string) string {
 				i = end + 1
 			} else {
 				// 无效类型格式，保持原样
-				result.WriteString(types[i:])
-				i = len(types)
+				result.WriteString(signature[i:])
+				i = len(signature)
 			}
 		default: // 基本类型 (Z, B, C, S, I, J, F, D, V)
-			result.WriteByte(types[i])
+			result.WriteByte(signature[i])
 			i++
 		}
 	}

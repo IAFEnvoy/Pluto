@@ -10,8 +10,9 @@ type SingleInfo struct {
 }
 
 func PackClassInfo(name string) SingleInfo {
+	name = strings.ReplaceAll(name, "/", ".")
 	return SingleInfo{
-		Name:      PathToClassName(name),
+		Name:      FullToClassName(name),
 		Class:     name,
 		Signature: ClassToByteCodeSignature(name),
 		Type:      "class",
@@ -50,9 +51,4 @@ func BuildMapping(mapping *map[SingleInfo]SingleInfo) *Mappings {
 		result.NamedByName[v.Name] = append(result.NamedByName[v.Name], v)
 	}
 	return &result
-}
-
-func PathToClassName(path string) string {
-	split := strings.Split(path, "/")
-	return split[len(split)-1]
 }

@@ -29,15 +29,6 @@ var (
 	loadMappingLock = util.NewNamedLock()
 )
 
-func CachedMapping(mcVersion, mappingType string) bool {
-	service, ok := serviceMap[mappingType]
-	if !ok {
-		return false
-	}
-	_, err := service.GetMappingCacheOrError(mcVersion)
-	return err == nil
-}
-
 func LoadMapping(mcVersion, mappingType string) (*java.Mappings, error) {
 	service, ok := serviceMap[mappingType]
 	if !ok {

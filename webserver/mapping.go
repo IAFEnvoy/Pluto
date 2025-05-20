@@ -3,19 +3,19 @@ package webserver
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pluto/global"
 	"pluto/mapping"
+	"time"
 )
 
 func initMappingApis(g *gin.Engine) {
-	g.GET("/api/mapping/load", func(c *gin.Context) {
+	g.GET("/api/mapping/load", RateLimiterMiddleware(5*time.Second, 2), func(c *gin.Context) {
 		mcVersion, mappingType := c.Query("version"), c.Query("type")
 		if mcVersion == "" || mappingType == "" {
 			c.String(http.StatusBadRequest, "Missing query parameter(s)")
 			return
 		}
 		if mapping.CachedMapping(mcVersion, mappingType) {
-			c.String(http.StatusOK, "Loaded", global.Version)
+			c.String(http.StatusOK, "Loaded")
 			return
 		}
 		_, err := mapping.LoadMapping(mcVersion, mappingType)
@@ -25,7 +25,7 @@ func initMappingApis(g *gin.Engine) {
 		}
 		c.String(http.StatusCreated, "Loading Complete")
 	})
-	g.GET("/api/mapping/search", func(c *gin.Context) {
+	g.GET("/api/mapping/search", RateLimiterMiddleware(2*time.Second, 5), func(c *gin.Context) {
 		mcVersion, mappingType, keyword := c.Query("version"), c.Query("type"), c.Query("keyword")
 		if mcVersion == "" || mappingType == "" || keyword == "" {
 			c.String(http.StatusBadRequest, "Missing query parameter(s)")

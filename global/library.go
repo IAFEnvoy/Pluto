@@ -38,7 +38,7 @@ const (
 	DecompilerPath        = LibraryPath + "/vineflower.jar"
 	TinyRemapperMainClass = "net.fabricmc.tinyremapper.Main"
 	ArtMainClass          = "net.neoforged.art.Main"
-	configPath            = LibraryPath + "/versions.json"
+	libraryConfigPath     = LibraryPath + "/versions.json"
 	httpTimeout           = 30 * time.Second
 )
 
@@ -51,7 +51,7 @@ func CheckLibrary() {
 	}
 
 	// 加载配置文件
-	config, err := util.LoadConfig[LibraryConfig](configPath)
+	config, err := util.LoadConfig[LibraryConfig](libraryConfigPath)
 	if err != nil {
 		slog.Error("Failed to load library global:  " + err.Error())
 		config = LibraryConfig{}
@@ -140,7 +140,7 @@ func CheckLibrary() {
 	}
 
 	// 保存更新后的配置
-	if err := util.SaveConfig(config, configPath); err != nil {
+	if err := util.SaveConfig(config, libraryConfigPath); err != nil {
 		slog.Error("Failed to save library global:  " + err.Error())
 	}
 }

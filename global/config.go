@@ -1,7 +1,6 @@
 package global
 
 import (
-	"github.com/gin-contrib/cors"
 	encoder "github.com/zwgblue/yaml-encoder"
 	"gopkg.in/yaml.v3"
 	"log/slog"
@@ -29,10 +28,9 @@ type ConfigObject struct {
 	Urls       Urls              `yaml:"urls" comment:"if official source is too slow, try BMCLAPI: https://bmclapidoc.bangbang93.com/"`
 	Remapper   JavaProgramConfig `yaml:"remapper"`
 	Decompiler JavaProgramConfig `yaml:"decompiler"`
-	Cors       cors.Config       `yaml:"cors"`
 }
 
-const ConfigPath = "config.yaml"
+const configPath = "config.yml"
 
 var Config = ConfigObject{
 	Port:     5678,
@@ -54,27 +52,22 @@ var Config = ConfigObject{
 		JavaParams:       []string{"-Xms2G", "-Xmx2G"},
 		DecompilerParams: []string{"--thread-count=1", "--skip-extra-files"},
 	},
-	Cors: cors.Config{
-		AllowOrigins: []string{"localhost"},
-		AllowMethods: []string{"GET"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
-	},
 }
 
 func LoadConfig() error {
-	slog.Info("Loading global config: " + ConfigPath)
-	if _, err := os.Stat(ConfigPath); os.IsNotExist(err) {
+	slog.Info("Loading global config: " + configPath)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		encoded := encoder.NewEncoder(Config, encoder.WithComments(encoder.CommentsOnHead))
 		bytes, err := encoded.Encode()
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(ConfigPath, bytes, 0644)
+		err = os.WriteFile(configPath, bytes, 0644)
 		if err != nil {
 			return err
 		}
 	} else {
-		data, err := os.ReadFile(ConfigPath)
+		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return err
 		}

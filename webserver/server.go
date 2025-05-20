@@ -1,7 +1,6 @@
 package webserver
 
 import (
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
@@ -14,9 +13,11 @@ func Launch() error {
 	gin.DefaultWriter = &util.SlogWriter{Level: slog.LevelInfo}
 	gin.DefaultErrorWriter = &util.SlogWriter{Level: slog.LevelError}
 	g := gin.Default()
-	g.Use(cors.New(global.Config.Cors))
 	g.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "{\"version\":\"%s\"}", global.Version)
+	})
+	g.GET("/.well-known/appspecific/com.chrome.devtools.json", func(c *gin.Context) {
+		c.String(http.StatusNoContent, "")
 	})
 	initMappingApis(g)
 	initSourceApi(g)

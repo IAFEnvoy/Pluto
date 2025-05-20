@@ -158,8 +158,8 @@ func (s *Yarn) Remap(mcVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	outputPath := global.GetRemappedPath(s, mappingPath)
-	err = util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "yarn", "named"}, false)
+	outputPath := global.GetRemappedPath(s, mcVersion)
+	err = util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "official", "named"}, false)
 	if err != nil {
 		return "", err
 	}

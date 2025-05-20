@@ -1,6 +1,7 @@
 package mapping
 
 import (
+	"log/slog"
 	"pluto/util"
 )
 
@@ -14,11 +15,11 @@ type TaskInfo struct {
 	Version     string
 }
 
-const configPath = "cache/available.json"
+const configPath = "cache/source-available.json"
 
 var (
 	availableConfig = AvailableConfig{}
-	pendingTasks    map[TaskInfo]struct{}
+	pendingTasks    = make(map[TaskInfo]struct{})
 )
 
 func InitMappingConfig() error {
@@ -60,15 +61,23 @@ func StartPending(mcVersion, mappingType string) {
 	}] = struct{}{}
 }
 
-func Done(mcVersion, mappingType string) {
+func FailurePending(mcVersion, mappingType string) {
 	delete(pendingTasks, TaskInfo{
 		MappingType: mappingType,
 		Version:     mcVersion,
 	})
+}
+
+func Done(mcVersion, mappingType string) {
+	FailurePending(mcVersion, mappingType)
 	switch mappingType {
 	case "official":
 		availableConfig.Official = append(availableConfig.Official, mcVersion)
 	case "yarn":
 		availableConfig.Yarn = append(availableConfig.Yarn, mcVersion)
+	}
+	err := util.SaveConfig(availableConfig, configPath)
+	if err != nil {
+		slog.Error("Failed to save " + configPath + ": " + err.Error())
 	}
 }

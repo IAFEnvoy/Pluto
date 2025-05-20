@@ -6,9 +6,10 @@ import (
 )
 
 type Mappings struct {
-	AllMapping  map[SingleInfo]SingleInfo
-	NotchByName map[string][]SingleInfo
-	NamedByName map[string][]SingleInfo
+	NotchToNamed map[SingleInfo]SingleInfo
+	NamedToNotch map[SingleInfo]SingleInfo
+	NotchByName  map[string][]SingleInfo
+	NamedByName  map[string][]SingleInfo
 }
 
 type InfoForNetwork struct {
@@ -42,17 +43,18 @@ func (m *Mappings) Search(keyword string, maxCount int) []InfoForNetwork {
 			continue
 		}
 		matchType := getMatchType(name, keyword)
-		for _, info := range infos {
-			if named, exists := m.AllMapping[info]; exists {
-				key := info.Name + "|" + named.Name
+		for _, notch := range infos {
+			// 直接从NotchToNamed获取对应的Named
+			if named, exists := m.NotchToNamed[notch]; exists {
+				key := notch.Name + "|" + named.Name
 				if _, ok := seen[key]; !ok {
 					seen[key] = struct{}{}
 					results = append(results, searchResult{
 						info: InfoForNetwork{
-							Notch: info,
+							Notch: notch,
 							Named: named,
 						},
-						typeWeight: getTypeWeight(info.Type),
+						typeWeight: getTypeWeight(notch.Type),
 						nameType:   1, // Notch匹配
 						matchType:  matchType,
 					})
@@ -67,27 +69,18 @@ func (m *Mappings) Search(keyword string, maxCount int) []InfoForNetwork {
 			continue
 		}
 		matchType := getMatchType(name, keyword)
-		for _, info := range infos {
-			// 查找对应的Notch
-			var notch SingleInfo
-			found := false
-			for n, named := range m.AllMapping {
-				if named == info {
-					notch = n
-					found = true
-					break
-				}
-			}
-			if found {
-				key := notch.Name + "|" + info.Name
+		for _, named := range infos {
+			// 直接从NamedToNotch获取对应的Notch
+			if notch, exists := m.NamedToNotch[named]; exists {
+				key := notch.Name + "|" + named.Name
 				if _, ok := seen[key]; !ok {
 					seen[key] = struct{}{}
 					results = append(results, searchResult{
 						info: InfoForNetwork{
 							Notch: notch,
-							Named: info,
+							Named: named,
 						},
-						typeWeight: getTypeWeight(info.Type),
+						typeWeight: getTypeWeight(named.Type),
 						nameType:   2, // Named匹配
 						matchType:  matchType,
 					})

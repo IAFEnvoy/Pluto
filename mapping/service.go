@@ -8,6 +8,8 @@ import (
 	"pluto/mapping/java"
 	"pluto/mapping/services"
 	"pluto/util"
+	"strconv"
+	"time"
 )
 
 type Service interface {
@@ -63,6 +65,7 @@ func LoadMapping(mcVersion, mappingType string) (*java.Mappings, error) {
 }
 
 func GenerateSource(mcVersion, mappingType string) (string, error) {
+	start := time.Now()
 	if !CanAddTask(mcVersion, mappingType) {
 		return "", errors.New("this type has generated or generating")
 	}
@@ -70,16 +73,22 @@ func GenerateSource(mcVersion, mappingType string) (string, error) {
 	if !ok {
 		return "", errors.New("unknown mapping type")
 	}
+
+	slog.Info(fmt.Sprintf("Decompiling source type %s for %s", mappingType, mcVersion))
 	StartPending(mcVersion, mappingType)
 	path, err := service.Remap(mcVersion)
 	if err != nil {
+		FailurePending(mcVersion, mappingType)
 		return "", err
 	}
 	sourcePath := global.GetSourceFolder(service, mcVersion)
-	err = util.ExecuteCommand(global.Config.JavaPath, []string{"-jar", global.DecompilerPath, path, sourcePath}, true)
+	params := util.ConcatMultipleSlices([][]string{global.Config.Decompiler.JavaParams, {"-jar", global.DecompilerPath}, global.Config.Decompiler.DecompilerParams, {path, sourcePath}})
+	err = util.ExecuteCommand(global.Config.JavaPath, params, true)
 	if err != nil {
+		FailurePending(mcVersion, mappingType)
 		return "", err
 	}
 	Done(mcVersion, mappingType)
+	slog.Info("Done in " + strconv.FormatInt(int64(time.Since(start)), 10) + "ms")
 	return sourcePath, nil
 }

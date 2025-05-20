@@ -38,12 +38,14 @@ func PackFieldInfo(name, class, signature string) SingleInfo {
 
 func BuildMapping(mapping *map[SingleInfo]SingleInfo) *Mappings {
 	result := Mappings{
-		AllMapping:  make(map[SingleInfo]SingleInfo, len(*mapping)),
-		NotchByName: make(map[string][]SingleInfo),
-		NamedByName: make(map[string][]SingleInfo),
+		NotchToNamed: make(map[SingleInfo]SingleInfo, len(*mapping)),
+		NamedToNotch: make(map[SingleInfo]SingleInfo, len(*mapping)),
+		NotchByName:  make(map[string][]SingleInfo),
+		NamedByName:  make(map[string][]SingleInfo),
 	}
 	for k, v := range *mapping {
-		result.AllMapping[k] = v
+		result.NotchToNamed[k] = v
+		result.NamedToNotch[v] = k
 		result.NotchByName[k.Name] = append(result.NotchByName[k.Name], k)
 		result.NamedByName[v.Name] = append(result.NamedByName[v.Name], v)
 	}

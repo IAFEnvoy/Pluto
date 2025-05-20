@@ -4,6 +4,7 @@ import (
 	"github.com/lmittmann/tint"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -12,7 +13,7 @@ type SlogWriter struct {
 }
 
 func (s *SlogWriter) Write(p []byte) (n int, err error) {
-	Logger.Log(nil, s.Level, string(p))
+	Logger.Log(nil, s.Level, strings.Trim(string(p), "\n\r "))
 	return len(p), nil
 }
 

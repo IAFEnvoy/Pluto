@@ -7,6 +7,7 @@ import (
 	"os"
 	"pluto/global"
 	"pluto/util/network"
+	"strings"
 )
 
 type SingleManifest struct {
@@ -27,8 +28,6 @@ type SingleFile struct {
 type Downloads struct {
 	Client         SingleFile     `json:"client"`
 	ClientMappings SingleManifest `json:"client_mappings"`
-	Server         SingleFile     `json:"server"`
-	ServerMappings SingleManifest `json:"server_mappings"`
 }
 
 type PistonData struct {
@@ -62,7 +61,7 @@ func GetOrDownload(mcVersion string) (Downloads, error) {
 		return Downloads{}, errors.New("Cannot find mc version " + mcVersion)
 	}
 	//request piston data
-	data, err = network.Get(url)
+	data, err = network.Get(replaceUrl(url))
 	if err != nil {
 		return Downloads{}, err
 	}
@@ -71,6 +70,8 @@ func GetOrDownload(mcVersion string) (Downloads, error) {
 	if err != nil {
 		return Downloads{}, err
 	}
+	downloads.Downloads.Client.Url = replaceUrl(downloads.Downloads.Client.Url)
+	downloads.Downloads.ClientMappings.Url = replaceUrl(downloads.Downloads.ClientMappings.Url)
 	cache[mcVersion] = downloads.Downloads
 	return downloads.Downloads, nil
 }
@@ -91,4 +92,8 @@ func GetMcJarPath(mcVersion string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func replaceUrl(url string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(url, "https://piston-meta.mojang.com", global.Config.Urls.MojangPistonMeta), "https://piston-data.mojang.com", global.Config.Urls.MojangPistonData)
 }

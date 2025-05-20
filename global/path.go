@@ -9,6 +9,14 @@ type Named interface {
 	GetName() string
 }
 
+type NamedImpl struct {
+	Name string
+}
+
+func (n NamedImpl) GetName() string {
+	return n.Name
+}
+
 func CreatePathAndReturn(path, file string) string {
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {

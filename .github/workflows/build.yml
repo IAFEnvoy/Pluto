@@ -1,0 +1,35 @@
+name: Go Build Pluto
+
+on: [ push,pull_request ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.24
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Build for Linux
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o pluto-linux-amd64
+          mkdir -p dist
+          mv pluto-linux-amd64 dist/
+          chmod +x dist/pluto-linux-amd64
+
+      - name: Build for Windows
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o pluto-windows-amd64.exe
+          mv pluto-windows-amd64.exe dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pluto-binaries
+          path: dist/
+          retention-days: 7

@@ -14,22 +14,19 @@ func convertGBKToUTF8(r io.Reader) io.Reader {
 	return transform.NewReader(r, simplifiedchinese.GBK.NewDecoder())
 }
 
-func ExecuteCommand(command string, args []string, printErrorOnly bool) {
+func ExecuteCommand(command string, args []string, printErrorOnly bool) error {
 	slog.Info("Executing command: " + command + " " + strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		slog.Error("Error creating stderr pipe: " + err.Error())
-		return
+		return err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		slog.Error("Error creating stdout pipe: " + err.Error())
-		return
+		return err
 	}
 	if err := cmd.Start(); err != nil {
-		slog.Error("Error starting command: " + err.Error())
-		return
+		return err
 	}
 	go func() {
 		scanner := bufio.NewScanner(convertGBKToUTF8(stderr))
@@ -46,7 +43,6 @@ func ExecuteCommand(command string, args []string, printErrorOnly bool) {
 			}
 		}
 	}()
-	if err := cmd.Wait(); err != nil {
-		slog.Error("Command finished with error: " + err.Error())
-	}
+	err = cmd.Wait()
+	return err
 }

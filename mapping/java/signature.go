@@ -1,4 +1,4 @@
-package convert
+package java
 
 import (
 	"bytes"

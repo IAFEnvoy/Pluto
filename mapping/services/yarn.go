@@ -10,9 +10,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"pluto/convert"
 	"pluto/global"
-	"pluto/mapping/misc"
+	"pluto/mapping/java"
 	"pluto/util"
 	"pluto/util/network"
 	"pluto/vanilla"
@@ -30,11 +29,13 @@ type YarnVersion struct {
 	Stable      bool   `json:"stable"`
 }
 
-func (s Yarn) GetName() string {
+var yarnMappings = make(map[string]*java.Mappings)
+
+func (s *Yarn) GetName() string {
 	return "yarn"
 }
 
-func (s Yarn) GetPathOrDownload(mcVersion string) (string, error) {
+func (s *Yarn) GetPathOrDownload(mcVersion string) (string, error) {
 	path := global.GetMappingPath(s, mcVersion, "tiny")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return path, nil
@@ -74,7 +75,18 @@ func (s Yarn) GetPathOrDownload(mcVersion string) (string, error) {
 	return path, nil
 }
 
-func (s Yarn) LoadMapping(mcVersion string) (map[misc.SingleInfo]misc.SingleInfo, error) {
+func (s *Yarn) GetMappingCacheOrError(mcVersion string) (*java.Mappings, error) {
+	if mapping, ok := yarnMappings[mcVersion]; ok {
+		return mapping, nil
+	}
+	return nil, errors.New("not cached yet")
+}
+
+func (s *Yarn) SaveMappingCache(mcVersion string, mapping *java.Mappings) {
+	yarnMappings[mcVersion] = mapping
+}
+
+func (s *Yarn) LoadMapping(mcVersion string) (*map[java.SingleInfo]java.SingleInfo, error) {
 	path, err := s.GetPathOrDownload(mcVersion)
 	if err != nil {
 		return nil, err
@@ -85,7 +97,7 @@ func (s Yarn) LoadMapping(mcVersion string) (map[misc.SingleInfo]misc.SingleInfo
 	}
 	defer file.Close()
 
-	mapping := make(map[misc.SingleInfo]misc.SingleInfo)
+	mapping := make(map[java.SingleInfo]java.SingleInfo)
 	scanner := bufio.NewScanner(file)
 	if scanner.Scan() {
 		_ = scanner.Text() //Remove the first definition line
@@ -98,46 +110,46 @@ func (s Yarn) LoadMapping(mcVersion string) (map[misc.SingleInfo]misc.SingleInfo
 		}
 		switch split[0] {
 		case "CLASS":
-			notch, yarn := misc.PackClassInfo(split[1]), misc.PackClassInfo(split[3])
+			notch, yarn := java.PackClassInfo(split[1]), java.PackClassInfo(split[3])
 			mapping[notch] = yarn
 			break
 		case "METHOD":
-			yarnClass, ok := mapping[misc.PackClassInfo(split[1])]
+			yarnClass, ok := mapping[java.PackClassInfo(split[1])]
 			if !ok {
 				continue
 			}
-			notch, yarn := misc.PackMethodInfo(split[3], split[1], split[2]), misc.PackMethodInfo(split[5], yarnClass.Signature, "")
+			notch, yarn := java.PackMethodInfo(split[3], split[1], split[2]), java.PackMethodInfo(split[5], yarnClass.Signature, "")
 			mapping[notch] = yarn
 			break
 		case "FIELD":
-			yarnClass, ok := mapping[misc.PackClassInfo(split[1])]
+			yarnClass, ok := mapping[java.PackClassInfo(split[1])]
 			if !ok {
 				continue
 			}
-			notch, yarn := misc.PackFieldInfo(split[3], split[1], split[2]), misc.PackFieldInfo(split[5], yarnClass.Signature, "")
+			notch, yarn := java.PackFieldInfo(split[3], split[1], split[2]), java.PackFieldInfo(split[5], yarnClass.Signature, "")
 			mapping[notch] = yarn
 			break
 		}
 	}
-	//End processor
-	result, classMapping := make(map[misc.SingleInfo]misc.SingleInfo), make(map[string]string)
+	//Post processor
+	result, classMapping := make(map[java.SingleInfo]java.SingleInfo), make(map[string]string)
 	for notch, yarn := range mapping {
 		if notch.Type == "class" {
 			classMapping[notch.Signature] = yarn.Signature
 		}
 	}
 	for notch, yarn := range mapping {
-		notch.Name = convert.FullToClassName(notch.Name)
-		yarn.Name = convert.FullToClassName(yarn.Name)
+		notch.Name = java.FullToClassName(notch.Name)
+		yarn.Name = java.FullToClassName(yarn.Name)
 		if notch.Type == "method" {
-			yarn.Signature = misc.ObfuscateMethodSignature(notch.Signature, classMapping)
+			yarn.Signature = java.ObfuscateMethodSignature(notch.Signature, classMapping)
 		}
 		result[notch] = yarn
 	}
-	return result, nil
+	return &result, nil
 }
 
-func (s Yarn) Remap(mcVersion string) (string, error) {
+func (s *Yarn) Remap(mcVersion string) (string, error) {
 	jarPath, err := vanilla.GetMcJarPath(mcVersion)
 	if err != nil {
 		return "", err
@@ -147,7 +159,10 @@ func (s Yarn) Remap(mcVersion string) (string, error) {
 		return "", err
 	}
 	outputPath := global.GetRemappedPath(s, mappingPath)
-	util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "yarn", "named"}, false)
+	err = util.ExecuteCommand(global.Config.JavaPath, []string{"-cp", global.ClassPath, global.TinyRemapperMainClass, jarPath, outputPath, mappingPath, "yarn", "named"}, false)
+	if err != nil {
+		return "", err
+	}
 	return outputPath, nil
 }
 

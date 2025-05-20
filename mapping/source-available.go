@@ -18,7 +18,7 @@ const configPath = "cache/available.json"
 
 var (
 	availableConfig = AvailableConfig{}
-	pendingTasks    []TaskInfo
+	pendingTasks    map[TaskInfo]struct{}
 )
 
 func InitMappingConfig() error {
@@ -42,9 +42,33 @@ func IsAvailable(mcVersion, mappingType string) bool {
 }
 
 func IsPending(mcVersion, mappingType string) bool {
-	return util.Contains(pendingTasks, TaskInfo{mappingType, mcVersion})
+	_, ok := pendingTasks[TaskInfo{
+		MappingType: mappingType,
+		Version:     mcVersion,
+	}]
+	return ok
 }
 
 func CanAddTask(mcVersion, mappingType string) bool {
 	return !IsAvailable(mcVersion, mappingType) && !IsPending(mcVersion, mappingType)
+}
+
+func StartPending(mcVersion, mappingType string) {
+	pendingTasks[TaskInfo{
+		MappingType: mappingType,
+		Version:     mcVersion,
+	}] = struct{}{}
+}
+
+func Done(mcVersion, mappingType string) {
+	delete(pendingTasks, TaskInfo{
+		MappingType: mappingType,
+		Version:     mcVersion,
+	})
+	switch mappingType {
+	case "official":
+		availableConfig.Official = append(availableConfig.Official, mcVersion)
+	case "yarn":
+		availableConfig.Yarn = append(availableConfig.Yarn, mcVersion)
+	}
 }

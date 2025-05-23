@@ -80,6 +80,6 @@ func GenerateSource(mcVersion, mappingType string) (string, error) {
 		return "", err
 	}
 	Done(mcVersion, mappingType)
-	slog.Info("Done in " + strconv.FormatInt(int64(time.Since(start)), 10) + "ms")
+	slog.Info("Done in " + strconv.FormatInt(int64(time.Since(start)/1000000), 10) + "ms")
 	return sourcePath, nil
 }

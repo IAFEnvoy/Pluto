@@ -12,7 +12,7 @@ import (
 )
 
 func initSourceApi(g *gin.Engine) {
-	g.GET("/api/source/load", RateLimiterMiddleware(10*time.Second, 2), func(c *gin.Context) {
+	g.GET("/api/source/decompile", RateLimiterMiddleware(10*time.Second, 2), func(c *gin.Context) {
 		mcVersion, mappingType := c.Query("version"), c.Query("type")
 		if mcVersion == "" || mappingType == "" {
 			c.String(http.StatusBadRequest, "Missing query parameter(s)")
